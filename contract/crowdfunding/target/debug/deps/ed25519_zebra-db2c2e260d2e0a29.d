@@ -1,0 +1,10 @@
+/home/andrei/Documents/facultate/dad/crowdfunding/target/debug/deps/ed25519_zebra-db2c2e260d2e0a29.d: /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/lib.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/batch.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/error.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/signing_key.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/verification_key.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/../README.md
+
+/home/andrei/Documents/facultate/dad/crowdfunding/target/debug/deps/libed25519_zebra-db2c2e260d2e0a29.rmeta: /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/lib.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/batch.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/error.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/signing_key.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/verification_key.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/../README.md
+
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/lib.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/batch.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/error.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/signing_key.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/verification_key.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-zebra-4.0.3/src/../README.md:

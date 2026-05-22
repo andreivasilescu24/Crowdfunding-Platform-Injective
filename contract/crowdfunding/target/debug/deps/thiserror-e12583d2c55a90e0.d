@@ -1,0 +1,14 @@
+/home/andrei/Documents/facultate/dad/crowdfunding/target/debug/deps/thiserror-e12583d2c55a90e0.d: /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/andrei/Documents/facultate/dad/crowdfunding/target/debug/build/thiserror-2d968b5c7ad9a1bf/out/private.rs
+
+/home/andrei/Documents/facultate/dad/crowdfunding/target/debug/deps/libthiserror-e12583d2c55a90e0.rlib: /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/andrei/Documents/facultate/dad/crowdfunding/target/debug/build/thiserror-2d968b5c7ad9a1bf/out/private.rs
+
+/home/andrei/Documents/facultate/dad/crowdfunding/target/debug/deps/libthiserror-e12583d2c55a90e0.rmeta: /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/andrei/Documents/facultate/dad/crowdfunding/target/debug/build/thiserror-2d968b5c7ad9a1bf/out/private.rs
+
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/home/andrei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/home/andrei/Documents/facultate/dad/crowdfunding/target/debug/build/thiserror-2d968b5c7ad9a1bf/out/private.rs:
+
+# env-dep:OUT_DIR=/home/andrei/Documents/facultate/dad/crowdfunding/target/debug/build/thiserror-2d968b5c7ad9a1bf/out
