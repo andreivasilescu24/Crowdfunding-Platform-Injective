@@ -1,118 +1,189 @@
-// Mock contract client.
+// Real Injective CosmWasm client. Queries and executes both go through
+// gRPC-web; executes are signed by Keplr (signDirect) and broadcast via
+// TxGrpcApi. The REST endpoint (testnet.sentry.lcd.injective.network)
+// returns duplicated CORS headers, so we avoid it entirely.
 //
-// In a real deployment, replace these implementations with calls to the
-// CosmWasm contract on Injective (via CosmJS / InjectiveLabs SDK). The shape
-// of each function maps 1:1 to the spec:
-//
-//   create(...)                      → ExecuteMsg::Create
-//   donate(campaignId, amount)       → ExecuteMsg::Donate { campaign_id }
-//   claim(campaignId)                → ExecuteMsg::Claim  { campaign_id }
-//   refund(campaignId)               → ExecuteMsg::Refund { campaign_id }
-//   getCampaign(id)                  → QueryMsg::GetCampaign
-//   getContribution(id, addr)        → QueryMsg::GetContribution
-//   getAllCampaigns()                → QueryMsg::GetAllCampaigns
+// Spec mapping (kept 1:1 with contract/crowdfunding/src/msg.rs):
+//   create(...)                → ExecuteMsg::CreateCampaign
+//   donate(campaignId, amount) → ExecuteMsg::Donate
+//   claim(campaignId)          → ExecuteMsg::Claim
+//   refund(campaignId)         → ExecuteMsg::Refund
+//   getCampaign(id)            → QueryMsg::GetCampaign
+//   getContribution(id, addr)  → QueryMsg::GetContribution
+//   getAllCampaigns()          → QueryMsg::GetAllCampaigns
 
-import type { Campaign, Contribution } from "./types";
+import {
+  ChainGrpcAuthApi,
+  ChainGrpcTendermintApi,
+  ChainGrpcWasmApi,
+  MsgExecuteContract,
+  TxGrpcApi,
+  createTransaction,
+  toUtf8,
+} from "@injectivelabs/sdk-ts";
+import { DEFAULT_BLOCK_TIMEOUT_HEIGHT, getStdFee } from "@injectivelabs/utils";
+import Long from "long";
 
-const LS_CAMPAIGNS = "cf.campaigns.v1";
-const LS_CONTRIBS = "cf.contribs.v1";
+import {
+  CHAIN_ID,
+  CONTRACT_ADDRESS,
+  ENDPOINTS,
+  INJ_DENOM,
+  assertContractConfigured,
+} from "./network";
+import { baseToInj, injToBase } from "./inj";
+import type { Campaign } from "./types";
 
-function load<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
+// Mirrors the CampaignResponse struct in contract/crowdfunding/src/msg.rs.
+// We don't currently read `status` — the UI derives it from deadline + raised
+// vs goal — so we leave it off the type. Add it back if a consumer needs it.
+type ContractCampaign = {
+  id: number;
+  creator: string;
+  title: string;
+  description: string;
+  goal: string;
+  deadline: number;
+  current_amount: string;
+  claimed: boolean;
+};
+
+type CampaignListResponse = { campaigns: ContractCampaign[] };
+type ContributionResponse = { amount: string };
+
+const wasmApi = new ChainGrpcWasmApi(ENDPOINTS.grpc);
+const authApi = new ChainGrpcAuthApi(ENDPOINTS.grpc);
+const tmApi = new ChainGrpcTendermintApi(ENDPOINTS.grpc);
+const txApi = new TxGrpcApi(ENDPOINTS.grpc);
+
+function toCampaign(c: ContractCampaign): Campaign {
+  return {
+    id: c.id,
+    creator: c.creator,
+    title: c.title,
+    description: c.description,
+    goalInj: baseToInj(c.goal),
+    raisedInj: baseToInj(c.current_amount),
+    deadline: c.deadline,
+    withdrawn: c.claimed,
+  };
+}
+
+async function querySmart<T>(msg: object): Promise<T> {
+  assertContractConfigured();
+  const res = await wasmApi.fetchSmartContractState(CONTRACT_ADDRESS, msg);
+  return JSON.parse(toUtf8(res.data)) as T;
+}
+
+async function signAndBroadcast(
+  sender: string,
+  msg: object,
+  funds?: { denom: string; amount: string },
+): Promise<string> {
+  assertContractConfigured();
+  if (typeof window === "undefined") throw new Error("Window unavailable");
+  const keplr = window.keplr;
+  if (!keplr) throw new Error("Keplr not found");
+
+  await keplr.enable(CHAIN_ID);
+  const key = await keplr.getKey(CHAIN_ID);
+  if (key.bech32Address !== sender) {
+    throw new Error(
+      `Connected wallet (${key.bech32Address}) doesn't match the sender (${sender}).`,
+    );
   }
-}
+  const pubKey = Buffer.from(key.pubKey).toString("base64");
 
-function save<T>(key: string, value: T) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
+  const account = await authApi.fetchAccount(sender);
+  const accountNumber = account.baseAccount.accountNumber;
+  const sequence = account.baseAccount.sequence;
 
-function seedIfEmpty() {
-  const existing = load<Campaign[]>(LS_CAMPAIGNS, []);
-  if (existing.length > 0) return;
-  const now = Math.floor(Date.now() / 1000);
-  const seed: Campaign[] = [
-    {
-      id: 1,
-      creator: "inj1demo0creator0addressxxxxxxxxxxxxxxxxx",
-      title: "Open-source SIP routing toolkit",
-      description:
-        "Funding maintainers to release a polished, audited toolkit for SIP routing experimentation on OpenSIPs and Kamailio.",
-      goalInj: "120",
-      raisedInj: "47.5",
-      deadline: now + 60 * 60 * 24 * 12,
-      withdrawn: false,
-    },
-    {
-      id: 2,
-      creator: "inj1demo0creator0addressxxxxxxxxxxxxxxxxx",
-      title: "Community node operator grants",
-      description:
-        "Microgrants to bootstrap validator and IBC relayer operators in underrepresented regions.",
-      goalInj: "300",
-      raisedInj: "312.4",
-      deadline: now - 60 * 60 * 24 * 2,
-      withdrawn: false,
-    },
-    {
-      id: 3,
-      creator: "inj1otherxcreatorxxxxxxxxxxxxxxxxxxxxxxxxx",
-      title: "DeFi safety analyzer",
-      description:
-        "A static-analysis tool that flags risky CosmWasm patterns in audited contracts.",
-      goalInj: "80",
-      raisedInj: "12",
-      deadline: now - 60 * 60 * 24 * 1,
-      withdrawn: false,
-    },
+  const latestBlock = (await tmApi.fetchLatestBlock()) as
+    | { header?: { height?: number | string } }
+    | undefined;
+  const rawHeight = latestBlock?.header?.height;
+  if (rawHeight == null) {
+    throw new Error("Could not fetch latest block height from chain.");
+  }
+  const timeoutHeight = Number(rawHeight) + Number(DEFAULT_BLOCK_TIMEOUT_HEIGHT);
+
+  const execMsg = MsgExecuteContract.fromJSON({
+    sender,
+    contractAddress: CONTRACT_ADDRESS,
+    msg,
+    funds: funds ? [funds] : undefined,
+  });
+
+  const { txRaw, signDoc } = createTransaction({
+    pubKey,
+    chainId: CHAIN_ID,
+    fee: getStdFee({ gas: "1000000" }),
+    message: execMsg,
+    sequence,
+    timeoutHeight,
+    accountNumber,
+  });
+
+  const directSignResponse = await keplr.signDirect(CHAIN_ID, sender, {
+    bodyBytes: signDoc.bodyBytes,
+    authInfoBytes: signDoc.authInfoBytes,
+    chainId: CHAIN_ID,
+    accountNumber: Long.fromNumber(accountNumber),
+  });
+
+  // Keplr may modify the fee before signing, so we must broadcast the bytes
+  // it actually signed — not our pre-sign txRaw.
+  txRaw.bodyBytes = directSignResponse.signed.bodyBytes;
+  txRaw.authInfoBytes = directSignResponse.signed.authInfoBytes;
+  txRaw.signatures = [
+    Uint8Array.from(Buffer.from(directSignResponse.signature.signature, "base64")),
   ];
-  save(LS_CAMPAIGNS, seed);
-}
 
-function nextId(campaigns: Campaign[]): number {
-  return campaigns.reduce((m, c) => Math.max(m, c.id), 0) + 1;
-}
+  const txResponse = await txApi.broadcast(txRaw);
 
-function addDecimals(a: string, b: string): string {
-  return (parseFloat(a || "0") + parseFloat(b || "0")).toString();
-}
-
-function subDecimals(a: string, b: string): string {
-  return (parseFloat(a || "0") - parseFloat(b || "0")).toString();
-}
-
-// Simulate a signed transaction so the UI feels real.
-async function fakeTx<T>(work: () => T): Promise<T> {
-  await new Promise((r) => setTimeout(r, 600 + Math.random() * 400));
-  return work();
+  if (txResponse.code !== 0) {
+    throw new Error(`Tx failed (code ${txResponse.code}): ${txResponse.rawLog}`);
+  }
+  return txResponse.txHash;
 }
 
 export const contract = {
   // --- queries -------------------------------------------------------------
   async getAllCampaigns(): Promise<Campaign[]> {
-    seedIfEmpty();
-    return load<Campaign[]>(LS_CAMPAIGNS, []);
+    // Paginate: the contract caps to MAX_LIMIT=30 per page.
+    const all: ContractCampaign[] = [];
+    let startAfter: number | null = null;
+    for (;;) {
+      const resp: CampaignListResponse = await querySmart<CampaignListResponse>({
+        get_all_campaigns: { start_after: startAfter, limit: 30 },
+      });
+      const page: ContractCampaign[] = resp.campaigns ?? [];
+      all.push(...page);
+      if (page.length < 30) break;
+      startAfter = page[page.length - 1].id;
+    }
+    return all.map(toCampaign);
   },
 
   async getCampaign(id: number): Promise<Campaign | undefined> {
-    const list = await contract.getAllCampaigns();
-    return list.find((c) => c.id === id);
+    try {
+      const resp = await querySmart<ContractCampaign>({ get_campaign: { campaign_id: id } });
+      return toCampaign(resp);
+    } catch (e) {
+      // Only treat "not found" as undefined; let other errors surface.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/not\s*found/i.test(msg) || /type:\s*crowdfunding::state::Campaign/i.test(msg)) {
+        return undefined;
+      }
+      throw e;
+    }
   },
 
   async getContribution(campaignId: number, donor: string): Promise<string> {
-    const list = load<Contribution[]>(LS_CONTRIBS, []);
-    const row = list.find((c) => c.campaignId === campaignId && c.donor === donor);
-    return row?.amountInj ?? "0";
-  },
-
-  async getContributionsFor(donor: string): Promise<Contribution[]> {
-    const list = load<Contribution[]>(LS_CONTRIBS, []);
-    return list.filter((c) => c.donor === donor && parseFloat(c.amountInj) > 0);
+    const resp = await querySmart<ContributionResponse>({
+      get_contribution: { campaign_id: campaignId, contributor: donor },
+    });
+    return baseToInj(resp.amount);
   },
 
   // --- executes ------------------------------------------------------------
@@ -122,92 +193,34 @@ export const contract = {
     description: string;
     goalInj: string;
     durationSec: number;
-  }): Promise<Campaign> {
-    return fakeTx(() => {
-      const list = load<Campaign[]>(LS_CAMPAIGNS, []);
-      const c: Campaign = {
-        id: nextId(list),
-        creator: input.creator,
+  }): Promise<void> {
+    const deadline = Math.floor(Date.now() / 1000) + input.durationSec;
+    await signAndBroadcast(input.creator, {
+      create_campaign: {
         title: input.title.trim(),
         description: input.description.trim(),
-        goalInj: input.goalInj,
-        raisedInj: "0",
-        deadline: Math.floor(Date.now() / 1000) + input.durationSec,
-        withdrawn: false,
-      };
-      save(LS_CAMPAIGNS, [c, ...list]);
-      return c;
+        goal: injToBase(input.goalInj),
+        deadline,
+      },
     });
   },
 
   async donate(campaignId: number, donor: string, amountInj: string): Promise<void> {
-    return fakeTx(() => {
-      const campaigns = load<Campaign[]>(LS_CAMPAIGNS, []);
-      const idx = campaigns.findIndex((c) => c.id === campaignId);
-      if (idx === -1) throw new Error("Campaign not found");
-      const c = campaigns[idx];
-      if (Math.floor(Date.now() / 1000) >= c.deadline)
-        throw new Error("Campaign deadline has passed");
-      c.raisedInj = addDecimals(c.raisedInj, amountInj);
-      campaigns[idx] = c;
-      save(LS_CAMPAIGNS, campaigns);
-
-      const contribs = load<Contribution[]>(LS_CONTRIBS, []);
-      const cIdx = contribs.findIndex(
-        (x) => x.campaignId === campaignId && x.donor === donor,
-      );
-      if (cIdx === -1) {
-        contribs.push({ campaignId, donor, amountInj });
-      } else {
-        contribs[cIdx].amountInj = addDecimals(contribs[cIdx].amountInj, amountInj);
-      }
-      save(LS_CONTRIBS, contribs);
-    });
+    await signAndBroadcast(
+      donor,
+      { donate: { campaign_id: campaignId } },
+      { denom: INJ_DENOM, amount: injToBase(amountInj) },
+    );
   },
 
   async claim(campaignId: number, sender: string): Promise<void> {
-    return fakeTx(() => {
-      const campaigns = load<Campaign[]>(LS_CAMPAIGNS, []);
-      const idx = campaigns.findIndex((c) => c.id === campaignId);
-      if (idx === -1) throw new Error("Campaign not found");
-      const c = campaigns[idx];
-      if (c.creator !== sender) throw new Error("Only the creator can claim");
-      if (Math.floor(Date.now() / 1000) < c.deadline)
-        throw new Error("Deadline has not passed yet");
-      if (parseFloat(c.raisedInj) < parseFloat(c.goalInj))
-        throw new Error("Goal not reached");
-      if (c.withdrawn) throw new Error("Funds already withdrawn");
-      c.withdrawn = true;
-      campaigns[idx] = c;
-      save(LS_CAMPAIGNS, campaigns);
-    });
+    await signAndBroadcast(sender, { claim: { campaign_id: campaignId } });
   },
 
   async refund(campaignId: number, donor: string): Promise<string> {
-    return fakeTx(() => {
-      const campaigns = load<Campaign[]>(LS_CAMPAIGNS, []);
-      const idx = campaigns.findIndex((c) => c.id === campaignId);
-      if (idx === -1) throw new Error("Campaign not found");
-      const c = campaigns[idx];
-      if (Math.floor(Date.now() / 1000) < c.deadline)
-        throw new Error("Deadline has not passed yet");
-      if (parseFloat(c.raisedInj) >= parseFloat(c.goalInj))
-        throw new Error("Goal was reached — refunds are not available");
-
-      const contribs = load<Contribution[]>(LS_CONTRIBS, []);
-      const cIdx = contribs.findIndex(
-        (x) => x.campaignId === campaignId && x.donor === donor,
-      );
-      if (cIdx === -1 || parseFloat(contribs[cIdx].amountInj) <= 0)
-        throw new Error("No contribution to refund");
-
-      const refundAmount = contribs[cIdx].amountInj;
-      c.raisedInj = subDecimals(c.raisedInj, refundAmount);
-      contribs[cIdx].amountInj = "0";
-      campaigns[idx] = c;
-      save(LS_CAMPAIGNS, campaigns);
-      save(LS_CONTRIBS, contribs);
-      return refundAmount;
-    });
+    const prior = await contract.getContribution(campaignId, donor);
+    await signAndBroadcast(donor, { refund: { campaign_id: campaignId } });
+    return prior;
   },
 };
+
