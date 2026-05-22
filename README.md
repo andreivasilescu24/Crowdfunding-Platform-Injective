@@ -1,5 +1,7 @@
 # Crowdfunding DApp — Injective
 
+**Live demo:** https://crowdfunding-platform-injective.vercel.app/
+
 A permissionless crowdfunding platform built on Injective. Users create campaigns with an INJ target and a deadline. Donors contribute INJ tokens directly to the contract. If the goal is reached after the deadline, the creator claims the funds; otherwise, donors get a full refund.
 
 ---
