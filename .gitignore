@@ -2,5 +2,9 @@ node_modules/
 .next/
 out/
 .env*
+!.env.example
+tsconfig.tsbuildinfo
+scripts/.venv/
+__pycache__/
 .DS_Store
 *.log

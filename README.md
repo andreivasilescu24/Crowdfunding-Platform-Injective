@@ -63,3 +63,60 @@ Contextual actions — shown only when conditions are met:
 | **Donate** | Any connected wallet | Campaign is still active |
 | **Claim** | Creator only | Deadline passed + goal reached + not yet withdrawn |
 | **Refund** | Donors only | Deadline passed + goal **not** reached + has a contribution |
+
+---
+
+## 3. Running locally
+
+### Prerequisites
+
+- **Node.js** and **npm** (for the frontend)
+- **Docker** (for building the CosmWasm contract — no Rust toolchain needed)
+- **Python** (for the deploy/test scripts)
+- **Keplr** browser extension with **Injective Testnet** added and a funded testnet wallet
+  (faucet: <https://testnet.faucet.injective.network/>)
+
+### Frontend
+
+```bash
+npm install
+cp .env.example .env.local        # fill in NEXT_PUBLIC_CONTRACT_ADDRESS after deploying
+npm run dev                       # http://localhost:3000
+```
+
+### Smart contract — build
+
+The wasm is produced by the official CosmWasm optimizer (Docker, reproducible builds).
+The wasm output isn't committed; you build it locally:
+
+```bash
+cd contract/crowdfunding
+docker run --rm -v "$(pwd)":/code \
+  --mount type=volume,source=crowdfunding_cache,target=/target \
+  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+  cosmwasm/optimizer-arm64:0.17.0   # use cosmwasm/optimizer:0.17.0 on amd64
+```
+
+This produces `contract/crowdfunding/artifacts/crowdfunding.wasm` (~222 KB).
+
+### Smart contract — deploy & test
+
+See [scripts/README.md](scripts/README.md) for the one-time Python venv setup, then:
+
+```bash
+scripts/.venv/bin/python scripts/deploy.py   # uploads wasm + instantiates
+scripts/.venv/bin/python scripts/smoke.py    # creates + donates + queries end-to-end
+```
+
+`deploy.py` prints the new contract address; copy it into `.env.local` as
+`NEXT_PUBLIC_CONTRACT_ADDRESS=…`, then restart `npm run dev`.
+
+### Environment variables
+
+See [.env.example](.env.example). All variables live in `.env.local` (gitignored):
+
+| Variable | Used by | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_NETWORK` | frontend | `testnet` (default) or `mainnet` |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | frontend + smoke | Set after `deploy.py` |
+| `DEPLOYER_MNEMONIC` | deploy.py + smoke.py | Testnet seed phrase only |

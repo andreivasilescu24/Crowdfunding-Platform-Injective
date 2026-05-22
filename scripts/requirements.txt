@@ -1,0 +1,2 @@
+injective-py==1.14.1
+python-dotenv>=1.0,<2
